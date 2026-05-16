@@ -1,0 +1,19 @@
+.DS_Store
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+
+# ColabFold / AlphaFold outputs
+*.result.zip
+*.done.txt
+*.log
+*.pdb
+*.cif
+*.a3m
+*.json
+*.png
+
+# Local environments
+.venv/
+venv/
+env/
