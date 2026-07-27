@@ -1,50 +1,100 @@
 # Targeted Masking
 
-Targeted Masking is a framework built on top of AlphaFold2/ColabFold designed to reduce excessive conformational bias introduced by evolutionary information in multiple sequence alignments (MSAs). The goal is to improve exploration of alternative structural states, particularly for dynamic systems such as voltage-gated ion channels and membrane proteins.
+Targeted Masking is an AlphaFold2/ColabFold workflow for hypothesis-driven conformational sampling.
+It selectively masks user-defined columns of a multiple sequence alignment (MSA) while retaining the
+query sequence and the evolutionary information outside the selected region.
 
-In standard AlphaFold/ColabFold workflows, the MSA strongly constrains residue-residue relationships toward the dominant evolutionary state represented in sequence databases. While this is extremely powerful for structure prediction, it can limit sampling of biologically relevant alternative conformations, especially for proteins that undergo large-scale functional transitions.
+![Targeted masking and conformational sampling](assets/targeted-masking-conformational-sampling.png)
 
-Targeted Masking introduces controlled perturbations into the MSA by selectively masking:
+The goal is not to force AlphaFold2 toward a chosen structure. The goal is to relax local evolutionary
+constraints at mutation sites or conformationally variable regions while preserving the broader MSA
+context that helps AlphaFold2 model large proteins accurately.
 
-- mutation sites,
-- flexible loops,
-- gating charge regions,
-- experimentally relevant dynamic motifs,
-- or user-defined residue ranges.
+## Rationale
 
-The framework currently supports:
+AlphaFold2 has learned general principles of protein structure, but predictions of large multidomain
+proteins still benefit strongly from the residue-coupling information encoded in an MSA. For
+voltage-gated ion channels, an intact MSA helps maintain the transmembrane fold, pore architecture,
+domain packing, and long-range relationships across a very large sequence.
 
-- deterministic masking of specific residues ("mutant masking"),
-- stochastic masking of selected regions ("channel masking" / conformational masking),
-- multimer-aware masking,
-- and customizable masking percentages to tune conformational variability.
+That evolutionary information can also favor the dominant sequence-compatible geometry. At mutation
+sites or regions known or suspected to participate in alternative conformations, a strong local MSA
+signal may reduce structural variability and bias repeated predictions toward one basin. Removing too
+much MSA information is not an ideal solution because it can compromise the global accuracy gained
+from homologous sequences.
 
-The original motivation for this work came from studies of voltage-gated calcium ion channels (VGICs), particularly CaV1.2 voltage-sensing domains, where experimentally relevant conformational heterogeneity is difficult to capture using conventional AlphaFold pipelines alone. However, the approach is designed to be generalizable to many dynamic protein systems.
+Targeted masking is a middle ground:
 
-This repository aims to provide:
+- keep the query sequence unchanged;
+- retain the MSA outside the selected region;
+- mask selected alignment columns in homologous sequences;
+- generate vanilla and targeted-masked ensembles under otherwise matched settings;
+- test whether variability increases locally without disrupting the rest of the protein.
 
-- reproducible masking utilities,
-- ColabFold-compatible workflows,
-- exploratory conformational sampling tools,
-- and a lightweight framework for hypothesis-driven structural perturbation experiments.
+Candidate targets include mutation sites, voltage-sensor segments, intracellular gates, flexible
+linkers, ligand-coupling motifs, and other regions supported by a structural or functional hypothesis.
 
-The philosophy behind Targeted Masking is not to "force" a structure into a desired state, but rather to partially relax evolutionary constraints in carefully selected regions and allow the model to explore alternative energetic and conformational solutions.
+This is a sampling strategy, not a state classifier. Increased variability does not by itself prove
+that additional models represent functional conformations. Predictions require convergence checks,
+structural-quality control, comparison across independent seeds, and validation against experimental
+structures.
 
-## Repository Contents
+## Workflow
 
-- [targetedMasking_AF2_v1_Cav12_vsd2Test.ipynb](targetedMasking_AF2_v1_Cav12_vsd2Test.ipynb): ColabFold/AlphaFold2 notebook with targeted MSA masking controls and visualization.
-- [scripts/targetedMasking_multimer.py](scripts/targetedMasking_multimer.py): standalone A3M masking utility for multimer-aware, query-referenced residue masking.
-- [tests/test_targeted_masking_multimer.py](tests/test_targeted_masking_multimer.py): regression tests for the core masking behavior.
+```text
+sequence or multimer FASTA
+          │
+          ▼
+ColabFold MSA generation
+          │
+          ├──────────────► vanilla AlphaFold2 prediction
+          │
+          ▼
+select mutation sites or dynamic regions
+          │
+          ▼
+mask those MSA columns in homologous sequences
+keep the query and all other MSA columns intact
+          │
+          ▼
+targeted-masked AlphaFold2 prediction
+          │
+          ▼
+compare ensembles using structural and experimental coordinates
+```
 
-## Quick Start
+The companion [VGIC mutant ensemble analysis](https://github.com/adrishg/vgci_mutants) repository
+implements the downstream evaluation for Cav1.2, Nav1.5, and Kv2.1. It compares vanilla and
+targeted-masked ensembles using convergence-filtered distance distributions, mutation-site analyses,
+structural integrity checks, and experimental PDB references.
 
-### Notebook Workflow
+## Repository contents
 
-Open the notebook in Google Colab, select a GPU runtime, and run the setup/input cells as usual. The notebook includes an optional targeted MSA masking section before prediction. Use that section to define mutation sites, dynamic regions, masking percentages, and chain-aware masking behavior.
+- [targetedMasking_AF2_v1_Cav12_vsd2Test.ipynb](targetedMasking_AF2_v1_Cav12_vsd2Test.ipynb):
+  ColabFold/AlphaFold2 notebook that runs matched vanilla and targeted-masked predictions.
+- [scripts/targetedMasking_multimer.py](scripts/targetedMasking_multimer.py):
+  standalone A3M masking utility with multimer-aware, query-referenced residue numbering.
+- [tests/test_targeted_masking_multimer.py](tests/test_targeted_masking_multimer.py):
+  regression tests for range parsing, chain handling, query preservation, and masking behavior.
 
-### Command-Line A3M Masking
+## Quick start
 
-The CLI masks selected chain-local query positions in a multimer A3M while preserving the first sequence, which is treated as the query.
+### Colab notebook
+
+Open the notebook in Google Colab and select a GPU runtime. The default workflow:
+
+1. accepts the input sequence or complex;
+2. generates the original ColabFold MSA;
+3. runs the vanilla prediction;
+4. creates a targeted-masked A3M from the same MSA;
+5. runs the targeted-masked prediction using matched model settings;
+6. reports the applied positions and displays the resulting structures.
+
+Define mutation sites and dynamic regions using 1-based, chain-local residue positions. Run the
+vanilla and targeted-masked branches with the same seeds, model configuration, recycle settings, and
+other sampling parameters whenever a controlled comparison is required.
+
+### Command-line A3M masking
 
 ```bash
 python scripts/targetedMasking_multimer.py \
@@ -63,26 +113,57 @@ Input assumptions:
 - multimer FASTA chains are separated with `:` by default, for example `CHAIN_A:CHAIN_B`;
 - residue positions are 1-based and chain-local;
 - lowercase A3M insertions and gaps do not count toward query residue numbering;
-- the first A3M sequence is preserved to maintain the original query.
+- the first A3M sequence is preserved as the query;
+- targeted positions are masked in homologous rows, not deleted from the alignment.
+
+## Choosing a masking experiment
+
+A useful masking experiment should begin with a defined question:
+
+- Which site or region is expected to be conformationally variable?
+- What structural coordinate will report that variability?
+- Which experimental structures define relevant reference geometries?
+- What unmasked regions must remain stable for the model to be considered valid?
+
+The masked region should be no broader than the hypothesis requires. Compare multiple mask definitions
+when possible, and retain a vanilla control generated from the same starting MSA.
+
+## Validation
+
+At minimum, evaluate:
+
+1. convergence across recycles and seeds;
+2. global fold and domain integrity;
+3. local distributions at the masked region;
+4. control regions outside the mask;
+5. overlap with coordinate-matched experimental structures;
+6. whether apparent broadening represents reproducible clusters rather than isolated failures.
+
+The [vgci_mutants](https://github.com/adrishg/vgci_mutants) analysis provides concrete examples of this
+validation strategy, including extra pore-integrity checks for tetrameric Kv2.1 and IFM-latch
+coordinates for Nav1.5.
 
 ## Development
 
-The standalone masking utility currently uses only the Python standard library. To run the regression tests:
+The standalone masking utility uses the Python standard library. Run its regression tests with:
 
 ```bash
 python -m unittest
 ```
 
-## Citation / Related Work
+## Citation and related work
 
-If you use this repository, please cite and/or refer to:
+If you use this repository, please cite or refer to:
 
-- Hernandez-Gonzalez et al., unpublished work on conformational state sampling in voltage-gated calcium channels.
-- Hernandez-Gonzalez et al., unpublished VGIC mutants study.
-- Related CaV1.2 conformational modeling repositories and associated future publications from the Yarov-Yarovoy Lab, UC Davis.
+- Hernandez-Gonzalez et al., unpublished work on conformational sampling in voltage-gated ion channels.
+- Hernandez-Gonzalez et al., unpublished VGIC mutant ensemble study.
+- Associated future publications from the Yarov-Yarovoy Lab, UC Davis.
 
 Additional citations and preprints will be added as manuscripts become publicly available.
 
 ## Disclaimer
 
-This repository is intended primarily as a research and hypothesis-generation framework. Targeted masking modifies the information content of the MSA and therefore may produce structures that differ from the dominant evolutionary state. Interpretation of resulting models should be guided by experimental evidence, biophysical reasoning, and appropriate validation strategies.
+Targeted masking changes the information supplied to AlphaFold2. Resulting models are hypotheses that
+must be evaluated with experimental evidence, biophysical reasoning, and appropriate structural
+quality control. Masking should not be interpreted as evidence that a predicted state is populated in
+cells or accessible under a particular physiological condition.

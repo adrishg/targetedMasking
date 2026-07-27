@@ -12,6 +12,7 @@ __pycache__/
 *.a3m
 *.json
 *.png
+!assets/targeted-masking-conformational-sampling.png
 
 # Local environments
 .venv/
