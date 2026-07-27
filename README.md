@@ -4,7 +4,7 @@ Targeted Masking is an AlphaFold2/ColabFold workflow for hypothesis-driven confo
 It selectively masks user-defined columns of a multiple sequence alignment (MSA) while retaining the
 query sequence and the evolutionary information outside the selected region.
 
-![Targeted masking and conformational sampling](assets/targeted-masking-conformational-sampling.png)
+![Targeted masking and conformational sampling](assets/targeted-masking-conformational-sampling_bgless.png)
 
 The goal is not to force AlphaFold2 toward a chosen structure. The goal is to relax local evolutionary
 constraints at mutation sites or conformationally variable regions while preserving the broader MSA
