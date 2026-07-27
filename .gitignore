@@ -13,6 +13,7 @@ __pycache__/
 *.json
 *.png
 !assets/targeted-masking-conformational-sampling.png
+!assets/targeted-masking-conformational-sampling_bgless.png
 
 # Local environments
 .venv/
