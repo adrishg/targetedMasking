@@ -2,12 +2,7 @@
 
 [![Open the Targeted Masking notebook in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/adrishg/targetedMasking/blob/main/targetedMasking_AF2_v1_Cav12_vsd2Test.ipynb)
 
-<img
-  src="assets/targeted-masking-conformational-sampling_bgless.png"
-  alt="Targeted masking and conformational sampling"
-  width="300"
-  align="right"
->
+<p align="right"><img src="./assets/targeted-masking-conformational-sampling_bgless.png" alt="Targeted masking and conformational sampling" width="300"></p>
 
 Targeted Masking is an AlphaFold2/ColabFold workflow for hypothesis-driven conformational sampling.
 It selectively masks user-defined columns of a multiple sequence alignment (MSA) while retaining the
