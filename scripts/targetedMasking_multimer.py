@@ -14,9 +14,9 @@ Multimer logic:
 - Mask chain-local positions for a selected chain (A, B, C, ...)
 
 Positions:
-- 1-based
-- Query numbering
-- Gaps '-' and lowercase inserts are ignored for counting
+- 1-based query match-state numbering
+- Lowercase insertions do not advance match-state numbering
+- Uppercase residues and '-' occupy match states; gaps remain gaps
 """
 
 import argparse
@@ -126,6 +126,15 @@ def build_query_map_chain(query_seq: str, start: int, end: int) -> Dict[int, Lis
             qmap.setdefault(qpos, []).append(i)
     return qmap
 
+
+def match_state_indices(sequence: str) -> List[int]:
+    """Return raw-string indices for A3M match states.
+
+    Lowercase insertion characters are excluded. Uppercase residues and
+    deletion gaps occupy match states.
+    """
+    return [index for index, char in enumerate(sequence) if char == "-" or "A" <= char <= "Z"]
+
 # ---------------------------- masking ---------------------------- #
 
 def mask_records(
@@ -143,9 +152,11 @@ def mask_records(
     query_header, query_seq = records[0]
     total_len = sum(chain_lengths)
 
-    if len(query_seq) != total_len:
+    query_match_indices = match_state_indices(query_seq)
+    if len(query_match_indices) != total_len or any(query_seq[i] == "-" for i in query_match_indices):
         raise ValueError(
-            f"A3M query length ({len(query_seq)}) != sum of chain lengths ({total_len})."
+            "A3M query must contain exactly the ungapped multimer FASTA match states: "
+            f"observed {len(query_match_indices)}, expected {total_len}."
         )
 
     offsets = chain_offsets(chain_lengths)
@@ -153,7 +164,6 @@ def mask_records(
         raise ValueError("Requested chain index exceeds number of chains.")
 
     start, end = offsets[mask_chain_index]
-    qmap = build_query_map_chain(query_seq, start, end)
 
     align_cols_mutant = []
     align_cols_channel = []
@@ -161,17 +171,17 @@ def mask_records(
     missing = []
 
     for qp in sorted(set(mutant_qpos + channel_qpos)):
-        if qp in qmap:
+        if 1 <= qp <= end - start:
             applied.append(qp)
         else:
             missing.append(qp)
 
     for qp in mutant_qpos:
-        if qp in qmap:
-            align_cols_mutant.extend(qmap[qp])
+        if 1 <= qp <= end - start:
+            align_cols_mutant.append(start + qp - 1)
     for qp in channel_qpos:
-        if qp in qmap:
-            align_cols_channel.extend(qmap[qp])
+        if 1 <= qp <= end - start:
+            align_cols_channel.append(start + qp - 1)
 
     align_cols_mutant = sorted(set(align_cols_mutant))
     align_cols_channel = sorted(set(align_cols_channel))
@@ -188,18 +198,26 @@ def mask_records(
             continue
 
         s = list(seq)
+        match_indices = match_state_indices(seq)
+        if len(match_indices) != total_len:
+            raise ValueError(
+                f"{hdr}: observed {len(match_indices)} A3M match states; expected {total_len}."
+            )
 
         for col in align_cols_mutant:
-            s[col] = mask_char(s[col])
+            raw_index = match_indices[col]
+            s[raw_index] = mask_char(s[raw_index])
 
         if align_cols_channel:
             if channel_fraction >= 1.0:
                 for col in align_cols_channel:
-                    s[col] = mask_char(s[col])
+                    raw_index = match_indices[col]
+                    s[raw_index] = mask_char(s[raw_index])
             elif channel_fraction > 0:
                 for col in align_cols_channel:
                     if rng.random() < channel_fraction:
-                        s[col] = mask_char(s[col])
+                        raw_index = match_indices[col]
+                        s[raw_index] = mask_char(s[raw_index])
 
         new_records.append((hdr, "".join(s)))
 

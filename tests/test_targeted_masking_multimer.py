@@ -4,6 +4,7 @@ import unittest
 
 from scripts.targetedMasking_multimer import (
     infer_chain_lengths_from_fasta,
+    match_state_indices,
     mask_records,
     parse_ranges,
 )
@@ -29,7 +30,7 @@ class TargetedMaskingMultimerTests(unittest.TestCase):
         records = [
             (">query", "ABCDE"),
             (">hit1", "ABCDE"),
-            (">hit2", "ABcDE"),
+            (">hit2", "ABcCDE"),
         ]
 
         masked, applied, missing = mask_records(
@@ -44,9 +45,56 @@ class TargetedMaskingMultimerTests(unittest.TestCase):
 
         self.assertEqual(masked[0], records[0])
         self.assertEqual(masked[1], (">hit1", "XXXDE"))
-        self.assertEqual(masked[2], (">hit2", "XXcDE"))
+        self.assertEqual(masked[2], (">hit2", "XXcXDE"))
         self.assertEqual(applied, [1, 2, 3])
         self.assertEqual(missing, [])
+
+    def test_lowercase_insertions_do_not_advance_match_state_numbering(self):
+        records = [
+            (">query", "ABCDE"),
+            (">hit", "aAbbcBCdDE"),
+        ]
+        masked, _, _ = mask_records(
+            records, mutant_qpos=[3], channel_qpos=[], channel_fraction=1.0,
+            masking_char="X", chain_lengths=[3, 2], mask_chain_index=0,
+        )
+        self.assertEqual(masked[1], (">hit", "aAbbcBXdDE"))
+        self.assertEqual(match_state_indices(records[1][1]), [1, 5, 6, 8, 9])
+
+    def test_deletion_gap_remains_gap_at_masked_match_state(self):
+        records = [(">query", "ABCDE"), (">hit", "AB-DE")]
+        masked, _, _ = mask_records(
+            records, mutant_qpos=[3], channel_qpos=[], channel_fraction=1.0,
+            masking_char="X", chain_lengths=[3, 2], mask_chain_index=0,
+        )
+        self.assertEqual(masked[1], records[1])
+
+    def test_multiple_insertions_before_and_adjacent_to_target_are_preserved(self):
+        records = [(">query", "ABCDE"), (">hit", "AabcBdeCDE")]
+        masked, _, _ = mask_records(
+            records, mutant_qpos=[2, 3], channel_qpos=[], channel_fraction=1.0,
+            masking_char="X", chain_lengths=[3, 2], mask_chain_index=0,
+        )
+        self.assertEqual(masked[1], (">hit", "AabcXdeXDE"))
+
+    def test_multimer_boundary_masks_only_selected_chain(self):
+        records = [(">query", "ABCDE"), (">hit", "ABcCDE")]
+        masked, applied, missing = mask_records(
+            records, mutant_qpos=[1, 2], channel_qpos=[], channel_fraction=1.0,
+            masking_char="X", chain_lengths=[3, 2], mask_chain_index=1,
+        )
+        self.assertEqual(masked[0], records[0])
+        self.assertEqual(masked[1], (">hit", "ABcCXX"))
+        self.assertEqual(applied, [1, 2])
+        self.assertEqual(missing, [])
+
+    def test_inconsistent_homolog_match_state_count_is_rejected(self):
+        records = [(">query", "ABCDE"), (">bad_hit", "ABcDE")]
+        with self.assertRaisesRegex(ValueError, "observed 4 A3M match states"):
+            mask_records(
+                records, mutant_qpos=[2], channel_qpos=[], channel_fraction=1.0,
+                masking_char="X", chain_lengths=[3, 2], mask_chain_index=0,
+            )
 
     def test_missing_positions_are_reported(self):
         records = [
