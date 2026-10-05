@@ -168,15 +168,13 @@ The standalone masking utility uses the Python standard library. Run its regress
 python -m unittest
 ```
 
-## Citation and related work
+## Citation
 
-If you use this repository, please cite or refer to:
+If you use this repository, please cite:
 
-- Hernandez-Gonzalez et al., unpublished work on conformational sampling in voltage-gated ion channels.
-- Hernandez-Gonzalez et al., unpublished VGIC mutant ensemble study.
-- Associated future publications from the Yarov-Yarovoy Lab, UC Davis.
-
-Additional citations and preprints will be added as manuscripts become publicly available.
+Hernandez-Gonzalez A, Lopez-Mateos D, Harris B, Narang K, Siritanapivat A, Yarov-Yarovoy V.
+Targeted multiple sequence alignment masking reshapes structural sampling in mutant voltage-gated
+ion channels. Yarov-Yarovoy Lab, University of California, Davis; 2026.
 
 ## Disclaimer
 
