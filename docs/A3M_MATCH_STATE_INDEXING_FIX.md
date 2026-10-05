@@ -15,7 +15,10 @@ Regression tests cover lowercase insertions, multiple and adjacent insertions,
 deletion gaps, query preservation, match-state length validation, and multimer
 chain boundaries.
 
-The correction demonstrates a defect in the prior implementation. It does not
-by itself establish that historical prediction inputs were affected. That
-requires the exact production A3Ms and masking command records, which are not
-available in the companion repository audit.
+Historical inputs were affected. The Kv2.1 masked MSAs (WT and F412L, all six
+archived versions) match the raw-string-position rule in every row and the
+query-column rule in only 7,337 of 20,478 homolog rows. Both the notebook's
+`make_masked_a3m` and the pre-fix multimer script applied query-derived raw
+indices to every row, which is that rule. Masked
+conditions built with that code must be regenerated and re-predicted.
+The notebook now uses the per-row query-column rule and verifies its output.

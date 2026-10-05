@@ -74,12 +74,22 @@ structural integrity checks, and experimental PDB references.
 
 - [targetedMasking_AF2_v1_Cav12_vsd2Test.ipynb](targetedMasking_AF2_v1_Cav12_vsd2Test.ipynb):
   ColabFold/AlphaFold2 notebook that runs matched vanilla and targeted-masked predictions.
-- [scripts/targetedMasking_multimer.py](scripts/targetedMasking_multimer.py):
-  standalone A3M masking utility with multimer-aware, query-referenced residue numbering.
-- [tests/test_targeted_masking_multimer.py](tests/test_targeted_masking_multimer.py):
-  regression tests for range parsing, chain handling, query preservation, and masking behavior.
+- [scripts/targetedMasking.py](scripts/targetedMasking.py):
+  standalone A3M masking for monomers, homomers and heteromers, with query-column numbering
+  ([a3m_masking.py](scripts/a3m_masking.py) and [masking_cli.py](scripts/masking_cli.py) are its shared code).
+- [tests/test_a3m_masking.py](tests/test_a3m_masking.py):
+  regression tests for insertions, gaps, chain boundaries, query preservation, and output verification.
 
 ## Quick start
+
+For verified standalone masking, use [targetedMasking.py](scripts/targetedMasking.py).
+It detects monomer, homomer (dimer, trimer, ...) or heteromer from the A3M header.
+It replaces the earlier `targetedMasking_multimer.py`. See the
+[A3M format and validation guide](docs/ROBUST_A3M_MASKING.md) for compact
+homomers, paired/unpaired heteromers, separate subunit files, dry runs and audit
+reports. Compact shared blocks require `--all-copies`; headers are preserved.
+The notebook applies the same query-column rule, preserves the ColabFold header,
+writes one line per sequence and re-reads the masked A3M to verify it before prediction.
 
 ### Colab notebook
 
@@ -92,6 +102,10 @@ Open the notebook in Google Colab and select a GPU runtime. The default workflow
 5. runs the targeted-masked prediction using matched model settings;
 6. reports the applied positions and displays the resulting structures.
 
+For complexes, `mask_chain` selects a unique chain (A = first unique sequence, B = second, ...).
+In a homomer all copies share one alignment, so every copy is masked. Masking uses `X` only, and
+the notebook stops if the masked A3M fails verification.
+
 Define mutation sites and dynamic regions using 1-based, chain-local residue positions. Run the
 vanilla and targeted-masked branches with the same seeds, model configuration, recycle settings, and
 other sampling parameters whenever a controlled comparison is required.
@@ -99,7 +113,7 @@ other sampling parameters whenever a controlled comparison is required.
 ### Command-line A3M masking
 
 ```bash
-python scripts/targetedMasking_multimer.py \
+python scripts/targetedMasking.py \
   --input-a3m input.a3m \
   --output-a3m masked.a3m \
   --multimer-fasta multimer.fasta \
@@ -112,7 +126,8 @@ python scripts/targetedMasking_multimer.py \
 
 Input assumptions:
 
-- multimer FASTA chains are separated with `:` by default, for example `CHAIN_A:CHAIN_B`;
+- `--multimer-fasta` is optional; it checks the A3M against chains separated with `:`, for example `CHAIN_A:CHAIN_B`;
+- `--mask-chain` names a unique chain in the A3M (A = first unique sequence); for a homomer add `--all-copies`;
 - residue positions are 1-based and chain-local;
 - lowercase A3M insertions and gaps do not count toward query residue numbering;
 - the first A3M sequence is preserved as the query;
